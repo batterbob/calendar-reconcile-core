@@ -5,6 +5,7 @@
 .venv/
 .validation-venv/
 .smoke-venv/
+.rc1-smoke-venv/
 __pycache__/
 *.egg-info/
 build/
