@@ -1,18 +1,33 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from itertools import permutations
 
 import pytest
 
-from calendar_reconcile_core import (AmbiguityBehavior, BoundsError, CalendarEvent,
-                                     EvidenceEvent, ReconcilePolicy, SubjectResolution)
-from calendar_reconcile_core.reconcile import (_evidence_key, correction_candidate,
-                                                reconcile, screen_duplicates)
+from calendar_reconcile_core import (
+    AmbiguityBehavior,
+    BoundsError,
+    CalendarEvent,
+    CalendarReconcileError,
+    EvidenceEvent,
+    IdentityError,
+    ReconcilePolicy,
+    SubjectResolution,
+)
+from calendar_reconcile_core.reconcile import (
+    _evidence_key,
+    correction_candidate,
+    reconcile,
+    screen_duplicates,
+)
 from calendar_reconcile_core.types import Reason
 
 
 def policy(**changes):
-    values = dict(allowed_sources=frozenset({"source-alpha", "source-beta"}),
-                  allow_subjectless_matches=False, max_candidate_comparisons=20)
+    values = {
+        "allowed_sources": frozenset({"source-alpha", "source-beta"}),
+        "allow_subjectless_matches": False,
+        "max_candidate_comparisons": 20,
+    }
     values.update(changes)
     return ReconcilePolicy(**values)
 
@@ -75,8 +90,8 @@ def test_subjectless_and_ambiguous_identity_fail_closed():
 
 
 def test_threshold_boundary_and_comparison_cap():
-    # Two of three token-set overlap is exactly 1/2.
-    assert reconcile([event(title="alpha beta")], [evidence(title="alpha gamma")],
+    # Two of four token-set overlap is exactly 1/2.
+    assert reconcile([event(title="alpha beta gamma")], [evidence(title="alpha beta delta")],
                      policy(title_match_threshold=0.5))[0]
     with pytest.raises(BoundsError):
         reconcile([event(), event("event-b")], [evidence(), evidence("proof-b")],
@@ -97,14 +112,14 @@ def test_correction_preserves_uid_and_increments_with_overflow_check():
     corrected = correction_candidate(event(), uid="opaque-uid", sequence=4,
                                     corrected_start=date(2026, 1, 4), corrected_end=date(2026, 1, 5))
     assert corrected.uid == "opaque-uid" and corrected.sequence == 5
-    with pytest.raises(Exception):
+    with pytest.raises(IdentityError):
         correction_candidate(event(), uid="opaque-uid", sequence=2_147_483_647,
                              corrected_start=date(2026, 1, 4), corrected_end=date(2026, 1, 5))
 
 
 def test_timed_events_must_be_aware_and_time_conflict_is_reported():
-    with pytest.raises(Exception):
+    with pytest.raises(CalendarReconcileError):
         CalendarEvent("bad", "event", "source-alpha", datetime(2026, 1, 1), datetime(2026, 1, 1, 1))
-    left = CalendarEvent("timed", "Event", "source-alpha", datetime(2026, 1, 2, 10, tzinfo=timezone.utc), datetime(2026, 1, 2, 11, tzinfo=timezone.utc), "subject-a")
-    right = EvidenceEvent("proof", "Event", "source-beta", datetime(2026, 1, 2, 12, tzinfo=timezone.utc), datetime(2026, 1, 2, 13, tzinfo=timezone.utc), 1, 1.0, "subject-a")
+    left = CalendarEvent("timed", "Event", "source-alpha", datetime(2026, 1, 2, 10, tzinfo=UTC), datetime(2026, 1, 2, 11, tzinfo=UTC), "subject-a")
+    right = EvidenceEvent("proof", "Event", "source-beta", datetime(2026, 1, 2, 12, tzinfo=UTC), datetime(2026, 1, 2, 13, tzinfo=UTC), 1, 1.0, "subject-a")
     assert reconcile([left], [right], policy(time_tolerance_seconds=0))[1][0].reason is Reason.TIME_MISMATCH

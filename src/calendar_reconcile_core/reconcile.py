@@ -6,9 +6,17 @@ from datetime import date, datetime
 from .errors import BoundsError, IdentityError
 from .match import is_matchable, times_compatible, title_similarity
 from .policy import AmbiguityBehavior, ReconcilePolicy
-from .types import (Agreement, CalendarEvent, Conflict, CorrectionCandidate,
-                    DuplicateCandidate, EvidenceEvent, MAX_SEQUENCE, Reason,
-                    SubjectResolver)
+from .types import (
+    MAX_SEQUENCE,
+    Agreement,
+    CalendarEvent,
+    Conflict,
+    CorrectionCandidate,
+    DuplicateCandidate,
+    EvidenceEvent,
+    Reason,
+    SubjectResolver,
+)
 
 
 def _event_key(event: CalendarEvent) -> tuple[str, str]:
@@ -57,7 +65,11 @@ def reconcile(events: tuple[CalendarEvent, ...] | list[CalendarEvent],
             # subject check occurs before title comparison; it is bounded by the
             # same global comparison budget and cannot create a correction.
             elif event.source_id in policy.allowed_sources and item.source_id in policy.allowed_sources:
-                from .match import resolved_subject, subject_is_resolved, subjects_compatible
+                from .match import (
+                    resolved_subject,
+                    subject_is_resolved,
+                    subjects_compatible,
+                )
                 if (subject_is_resolved(event, resolver, policy)
                         and subject_is_resolved(item, resolver, policy)
                         and subjects_compatible(resolved_subject(event, resolver, policy), resolved_subject(item, resolver, policy), policy)
