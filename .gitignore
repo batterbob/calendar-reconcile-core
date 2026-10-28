@@ -1,0 +1,11 @@
+.hypothesis/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+.validation-venv/
+.smoke-venv/
+__pycache__/
+*.egg-info/
+build/
+dist/
