@@ -4,6 +4,7 @@ from .ics import serialize_correction, serialize_event
 from .policy import AmbiguityBehavior, ReconcilePolicy
 from .types import (
                     Agreement,
+    AmbiguousDuplicateCandidate,
                     CalendarEvent,
                     Conflict,
                     CorrectionCandidate,
@@ -14,7 +15,7 @@ from .types import (
                     SubjectResolver,
 )
 
-__all__ = ["Agreement", "AmbiguityBehavior", "BoundsError", "CalendarEvent",
+__all__ = ["Agreement", "AmbiguityBehavior", "AmbiguousDuplicateCandidate", "BoundsError", "CalendarEvent",
            "CalendarReconcileError", "Conflict", "CorrectionCandidate",
            "DuplicateCandidate", "EvidenceEvent", "IdentityError", "Reason",
            "ReconcilePolicy", "SubjectResolution", "SubjectResolver",

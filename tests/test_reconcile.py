@@ -5,9 +5,11 @@ import pytest
 
 from calendar_reconcile_core import (
     AmbiguityBehavior,
+    AmbiguousDuplicateCandidate,
     BoundsError,
     CalendarEvent,
     CalendarReconcileError,
+    Conflict,
     EvidenceEvent,
     IdentityError,
     ReconcilePolicy,
@@ -104,8 +106,27 @@ def test_duplicate_screen_is_non_mutating_and_ambiguous_skips():
     assert screen_duplicates([proposed], existing, policy()) == ()
     chosen = screen_duplicates([proposed], existing,
                                policy(ambiguity_behavior=AmbiguityBehavior.REPORT))
-    assert chosen[0].existing_event_id == "old-a"
+    assert chosen == (AmbiguousDuplicateCandidate("new", ("old-a", "old-b"), 1.0),)
     assert proposed.title == "Fall concert"
+
+
+def test_duplicate_screen_requires_allowed_sources_and_resolved_identity():
+    unallowed = CalendarEvent("unallowed", "Fall concert", "source-gamma", date(2026, 1, 2),
+                              date(2026, 1, 3), "subject-a")
+    assert screen_duplicates([unallowed], [event("current")], policy()) == ()
+
+    unresolved = CalendarEvent("unresolved", "Fall concert", "source-alpha", date(2026, 1, 2),
+                               date(2026, 1, 3))
+    assert screen_duplicates([unresolved], [CalendarEvent("current", "Fall concert", "source-beta", date(2026, 1, 2), date(2026, 1, 3))],
+                             policy(allow_subjectless_matches=True)) == ()
+
+
+def test_mixed_all_day_and_timed_matches_are_conflicts_not_agreements():
+    timed = EvidenceEvent("timed", "Fall concert", "source-beta", datetime(2026, 1, 2, 10, tzinfo=UTC),
+                          datetime(2026, 1, 2, 11, tzinfo=UTC), 1, 1.0, "subject-a")
+    agreements, conflicts = reconcile([event()], [timed], policy())
+    assert agreements == ()
+    assert conflicts == (Conflict("event-a", ("timed",), Reason.TIME_MISMATCH),)
 
 
 def test_correction_preserves_uid_and_increments_with_overflow_check():

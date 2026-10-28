@@ -4,11 +4,20 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from .errors import BoundsError, IdentityError
-from .match import is_matchable, times_compatible, title_similarity
+from .match import (
+    dates_compatible,
+    is_matchable,
+    resolved_subject,
+    subject_is_resolved,
+    subjects_compatible,
+    times_compatible,
+    title_similarity,
+)
 from .policy import AmbiguityBehavior, ReconcilePolicy
 from .types import (
     MAX_SEQUENCE,
     Agreement,
+    AmbiguousDuplicateCandidate,
     CalendarEvent,
     Conflict,
     CorrectionCandidate,
@@ -64,19 +73,21 @@ def reconcile(events: tuple[CalendarEvent, ...] | list[CalendarEvent],
             # Date mismatch is a separate, non-agreement conflict path. Its
             # subject check occurs before title comparison; it is bounded by the
             # same global comparison budget and cannot create a correction.
-            elif event.source_id in policy.allowed_sources and item.source_id in policy.allowed_sources:
-                from .match import (
-                    resolved_subject,
-                    subject_is_resolved,
-                    subjects_compatible,
+            elif (
+                event.source_id in policy.allowed_sources
+                and item.source_id in policy.allowed_sources
+                and subject_is_resolved(event, resolver, policy)
+                and subject_is_resolved(item, resolver, policy)
+                and subjects_compatible(
+                    resolved_subject(event, resolver, policy),
+                    resolved_subject(item, resolver, policy),
+                    policy,
                 )
-                if (subject_is_resolved(event, resolver, policy)
-                        and subject_is_resolved(item, resolver, policy)
-                        and subjects_compatible(resolved_subject(event, resolver, policy), resolved_subject(item, resolver, policy), policy)
-                        and title_similarity(event, item, policy) >= policy.title_match_threshold):
-                    conflicts.append(Conflict(event.event_id, (item.evidence_id,), Reason.DATE_MISMATCH))
-                    if len(agreements) + len(conflicts) >= policy.max_findings:
-                        return tuple(agreements), tuple(conflicts)
+                and title_similarity(event, item, policy) >= policy.title_match_threshold
+            ):
+                conflicts.append(Conflict(event.event_id, (item.evidence_id,), Reason.DATE_MISMATCH))
+                if len(agreements) + len(conflicts) >= policy.max_findings:
+                    return tuple(agreements), tuple(conflicts)
         if not matches:
             continue
         # A source never becomes authoritative by rank alone. Different dates
@@ -97,23 +108,36 @@ def reconcile(events: tuple[CalendarEvent, ...] | list[CalendarEvent],
 def screen_duplicates(proposed: tuple[CalendarEvent, ...] | list[CalendarEvent],
                       existing: tuple[CalendarEvent, ...] | list[CalendarEvent],
                       policy: ReconcilePolicy, *, resolver: SubjectResolver | None = None
-                      ) -> tuple[DuplicateCandidate, ...]:
+                      ) -> tuple[DuplicateCandidate | AmbiguousDuplicateCandidate, ...]:
     """Return, never delete, deterministic same-date near-duplicate candidates."""
     proposed_items, existing_items = tuple(proposed), tuple(existing)
     if len(proposed_items) > policy.max_events or len(existing_items) > policy.max_events:
         raise BoundsError("input collection exceeds policy limit")
-    comparisons, found = 0, []
+    comparisons = 0
+    found: list[DuplicateCandidate | AmbiguousDuplicateCandidate] = []
     for candidate in sorted(proposed_items, key=_event_key):
+        if candidate.source_id not in policy.allowed_sources:
+            continue
+        if not subject_is_resolved(candidate, resolver, policy):
+            continue
+        candidate_subject = resolved_subject(candidate, resolver, policy)
+        if candidate_subject is None:
+            continue
         matches: list[tuple[float, CalendarEvent]] = []
         for current in sorted(existing_items, key=_event_key):
             comparisons += 1
             if comparisons > policy.max_candidate_comparisons:
                 raise BoundsError("candidate comparison limit exceeded")
-            # Reuse evidence-only matcher conditions directly for two events.
-            from .match import dates_compatible, resolved_subject, subjects_compatible
+            if current.source_id not in policy.allowed_sources:
+                continue
             if not dates_compatible(candidate, current, policy):
                 continue
-            if not subjects_compatible(resolved_subject(candidate, resolver, policy), resolved_subject(current, resolver, policy), policy):
+            if not subject_is_resolved(current, resolver, policy):
+                continue
+            current_subject = resolved_subject(current, resolver, policy)
+            if current_subject is None:
+                continue
+            if not subjects_compatible(candidate_subject, current_subject, policy):
                 continue
             similarity = title_similarity(candidate, current, policy)
             if similarity >= policy.title_match_threshold:
@@ -125,10 +149,17 @@ def screen_duplicates(proposed: tuple[CalendarEvent, ...] | list[CalendarEvent],
         tied = [entry for entry in matches if entry[0] == top_score]
         if len(tied) > 1 and policy.ambiguity_behavior is AmbiguityBehavior.SKIP:
             continue
-        for similarity, current in tied[:1]:
+        if len(tied) > 1:
+            found.append(AmbiguousDuplicateCandidate(
+                candidate.event_id,
+                tuple(current.event_id for _, current in tied),
+                top_score,
+            ))
+        else:
+            similarity, current = tied[0]
             found.append(DuplicateCandidate(candidate.event_id, current.event_id, similarity))
-            if len(found) >= policy.max_findings:
-                return tuple(found)
+        if len(found) >= policy.max_findings:
+            return tuple(found)
     return tuple(found)
 
 

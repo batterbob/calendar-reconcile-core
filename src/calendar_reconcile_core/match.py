@@ -58,7 +58,7 @@ def dates_compatible(left: CalendarEvent | EvidenceEvent, right: CalendarEvent |
 def times_compatible(left: CalendarEvent | EvidenceEvent, right: CalendarEvent | EvidenceEvent,
                      policy: ReconcilePolicy) -> bool:
     if left.is_all_day != right.is_all_day:
-        return True
+        return False
     if left.is_all_day:
         return True
     assert isinstance(left.start, datetime) and isinstance(right.start, datetime)

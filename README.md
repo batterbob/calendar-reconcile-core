@@ -17,6 +17,16 @@ extracts a person from an event title and never mutates a calendar.
 Version 0.1 accepts date-only all-day events and UTC timed events. It rejects
 non-UTC timed serialization rather than emitting an incomplete `VTIMEZONE`.
 
+## Local release gate
+
+Release verification requires a caller-supplied, readable private denylist and
+scans tracked files, every reachable Git blob, and both built archives. It
+fails closed for an absent, unreadable, malformed, or matching denylist:
+
+```bash
+python tools/check_release_tree.py --denylist /path/to/private-denylist.txt
+```
+
 ## Example
 
 ```python

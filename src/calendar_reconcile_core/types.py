@@ -145,6 +145,25 @@ class DuplicateCandidate:
 
 
 @dataclass(frozen=True, slots=True)
+class AmbiguousDuplicateCandidate:
+    """A tied duplicate set retained for explicit caller review."""
+
+    proposed_event_id: str
+    existing_event_ids: tuple[str, ...]
+    similarity: float
+    reason: Reason = Reason.AMBIGUOUS_MATCH
+
+    def __post_init__(self) -> None:
+        _text(self.proposed_event_id, "proposed_event_id", required=True, limit=MAX_ID)
+        if len(self.existing_event_ids) < 2:
+            raise CalendarReconcileError("ambiguous candidate requires at least two events")
+        for identifier in self.existing_event_ids:
+            _text(identifier, "existing_event_id", required=True, limit=MAX_ID)
+        if not isinstance(self.similarity, (int, float)) or not 0 <= self.similarity <= 1:
+            raise CalendarReconcileError("invalid similarity")
+
+
+@dataclass(frozen=True, slots=True)
 class CorrectionCandidate:
     event_id: str
     uid: str
