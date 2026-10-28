@@ -156,5 +156,6 @@ class CorrectionCandidate:
     def __post_init__(self) -> None:
         _text(self.uid, "uid", required=True, limit=MAX_ID)
         _range(self.corrected_start, self.corrected_end)
-        if not isinstance(self.sequence, int) or not 0 <= self.sequence <= MAX_SEQUENCE:
+        # Corrections always carry the already-incremented emitted sequence.
+        if not isinstance(self.sequence, int) or not 1 <= self.sequence <= MAX_SEQUENCE:
             raise CalendarReconcileError("invalid sequence")
