@@ -130,16 +130,20 @@ def scan_archives(dist: Path, denylist: tuple[str, ...]) -> int:
         raise ReleaseGateError("expected exactly one wheel and one sdist")
     members = 0
     with ZipFile(wheels[0]) as wheel:
-        for member in wheel.infolist():
-            _scan_bytes("wheel member name", member.filename.encode("utf-8"), denylist)
-            if not member.is_dir():
-                _scan_bytes("wheel member", wheel.read(member), denylist)
+        for wheel_member in wheel.infolist():
+            _scan_bytes(
+                "wheel member name", wheel_member.filename.encode("utf-8"), denylist
+            )
+            if not wheel_member.is_dir():
+                _scan_bytes("wheel member", wheel.read(wheel_member), denylist)
             members += 1
     with tarfile.open(sdists[0], "r:gz") as sdist:
-        for member in sdist.getmembers():
-            _scan_bytes("sdist member name", member.name.encode("utf-8"), denylist)
-            if member.isfile():
-                payload = sdist.extractfile(member)
+        for sdist_member in sdist.getmembers():
+            _scan_bytes(
+                "sdist member name", sdist_member.name.encode("utf-8"), denylist
+            )
+            if sdist_member.isfile():
+                payload = sdist.extractfile(sdist_member)
                 assert payload is not None
                 _scan_bytes("sdist member", payload.read(), denylist)
             members += 1
