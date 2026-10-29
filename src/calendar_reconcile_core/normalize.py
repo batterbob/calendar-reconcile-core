@@ -7,7 +7,7 @@ from .errors import BoundsError
 
 # Punctuation is deleted (rather than made whitespace) to retain possessive-like
 # tokens consistently. This fixed list is intentionally neutral and small.
-STOPWORDS = frozenset({"a", "an", "the", "at", "on", "for", "vs", "game", "practice"})
+STOPWORDS = frozenset({"a", "an", "the", "at", "on", "for"})
 
 
 def normalize_title(title: str, *, max_tokens: int = 64) -> tuple[str, ...]:

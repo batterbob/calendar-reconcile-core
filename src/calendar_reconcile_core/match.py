@@ -1,7 +1,7 @@
 """Pure matching primitives with opaque subject discipline."""
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from .normalize import jaccard, normalize_title
 from .policy import ReconcilePolicy
@@ -47,12 +47,17 @@ def title_similarity(left: CalendarEvent | EvidenceEvent, right: CalendarEvent |
 
 
 def _day(value: date | datetime) -> date:
-    return value if isinstance(value, date) and not isinstance(value, datetime) else value.date()
+    if isinstance(value, datetime):
+        return value.astimezone(UTC).date()
+    return value
 
 
 def dates_compatible(left: CalendarEvent | EvidenceEvent, right: CalendarEvent | EvidenceEvent,
                      policy: ReconcilePolicy) -> bool:
-    return abs((_day(left.start) - _day(right.start)).days) <= policy.date_tolerance_days
+    starts_match = abs((_day(left.start) - _day(right.start)).days) <= policy.date_tolerance_days
+    if not left.is_all_day or not right.is_all_day:
+        return starts_match
+    return starts_match and abs((_day(left.end) - _day(right.end)).days) <= policy.date_tolerance_days
 
 
 def times_compatible(left: CalendarEvent | EvidenceEvent, right: CalendarEvent | EvidenceEvent,
@@ -62,7 +67,11 @@ def times_compatible(left: CalendarEvent | EvidenceEvent, right: CalendarEvent |
     if left.is_all_day:
         return True
     assert isinstance(left.start, datetime) and isinstance(right.start, datetime)
-    return abs((left.start - right.start).total_seconds()) <= policy.time_tolerance_seconds
+    assert isinstance(left.end, datetime) and isinstance(right.end, datetime)
+    return (
+        abs((left.start - right.start).total_seconds()) <= policy.time_tolerance_seconds
+        and abs((left.end - right.end).total_seconds()) <= policy.time_tolerance_seconds
+    )
 
 
 def is_matchable(event: CalendarEvent, evidence: EvidenceEvent, policy: ReconcilePolicy,
