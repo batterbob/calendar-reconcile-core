@@ -61,11 +61,11 @@ The package deliberately does not:
 ## Installation
 
 The project is not currently published on PyPI. Download the wheel from the
-immutable `v0.1.0-rc1` GitHub release, verify its published SHA-256 value, and
+`v0.1.0-rc2` GitHub release candidate, verify its published SHA-256 value, and
 install it locally:
 
 ```bash
-python -m pip install ./calendar_reconcile_core-0.1.0rc1-py3-none-any.whl
+python -m pip install ./calendar_reconcile_core-0.1.0rc2-py3-none-any.whl
 ```
 
 Python 3.11 or newer is required. The runtime package uses only the Python

@@ -1,23 +1,27 @@
-# 0.1.0rc1 release report
+# 0.1.0rc2 draft release report
 
-- Candidate source commit: `c1d8e372bf98035cb27f8046668650bd8e2ea89d`
+- Candidate source commit: pending merge of the RC2 release-preparation pull
+  request.
 - Release target: public GitHub release candidate; no PyPI publication.
-- Privacy-gate status: passed against tracked files, every Git blob, wheel, and
-  sdist using the corrected external denylist.
+- Artifact build, hashes, lineage verification, and clean-install smoke tests:
+  pending from the final candidate commit.
+- Privacy-gate status: pending an independent, fail-closed scan using the
+  caller-supplied private denylist. No privacy receipt is claimed in this draft.
 
 ## Artifacts
 
 | File | SHA-256 |
 | --- | --- |
-| `calendar_reconcile_core-0.1.0rc1-py3-none-any.whl` | `e04e41f94e2754f0b0c4d018d4f89076045a20cfca187bb34229e4f2de2018a9` |
-| `calendar_reconcile_core-0.1.0rc1.tar.gz` | `698232bd43f53228ba488c34bc1b80e7984e8d72baaec5735adf9d57bdbbd289` |
+| `calendar_reconcile_core-0.1.0rc2-py3-none-any.whl` | Pending final-candidate build |
+| `calendar_reconcile_core-0.1.0rc2.tar.gz` | Pending final-candidate build |
 
-## Validation completed
+## Required release validation
 
-- 29 tests passed, plus Ruff and mypy across package, tests, and release tools.
-- Built wheel and sdist from the candidate source commit.
-- Installed the wheel into a new environment; installed metadata reports
-  `0.1.0rc1`.
-- Archive lineage passed: every packaged module byte-matches the candidate
-  source commit.
-- Full candidate privacy receipt: `PASS tracked=23 blobs=48 archive_members=41`.
+- Run the full test, Ruff, and mypy suites from the final candidate commit.
+- Build wheel and sdist artifacts from that commit, then record their SHA-256
+  hashes and archive-lineage receipts here.
+- Install both artifacts in clean environments and verify their metadata reports
+  `0.1.0rc2`.
+- Run `tools/check_release_tree.py` with the supplied private denylist against
+  the final candidate and its artifacts. Promotion remains blocked until it
+  passes.

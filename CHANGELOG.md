@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0rc2 — 2026-10-29
 
 - Corrected recurring-event reconciliation so aligned matches suppress cross-date noise, while unmatched date conflicts are aggregated deterministically.
 - Fail closed when reconciliation or duplicate-screening findings exceed the configured bound.
