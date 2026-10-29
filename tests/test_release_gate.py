@@ -27,3 +27,22 @@ def test_denylist_is_readable_and_casefolded(tmp_path: Path) -> None:
     denylist = tmp_path / "denylist.txt"
     denylist.write_text("section\n- Example Entry\n", encoding="utf-8")
     assert release_gate_module().load_denylist(denylist) == ("example entry",)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"pass" + b"word=not-a-real-secret",
+        b"person" + b"@" + b"nonreserved.test",
+    ],
+)
+def test_generic_sensitive_checks_reject_content_without_echoing_it(payload: bytes) -> None:
+    gate = release_gate_module()
+    with pytest.raises(gate.ReleaseGateError):
+        gate._scan_bytes("test receipt", payload, ())
+
+
+def test_filename_is_scanned_with_the_same_policy() -> None:
+    gate = release_gate_module()
+    with pytest.raises(gate.ReleaseGateError):
+        gate._scan_bytes("test receipt", b"name-with-marker", ("marker",))
