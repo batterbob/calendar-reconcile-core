@@ -22,7 +22,7 @@ dates, times, and titles. This package keeps the risky policy decisions visible:
 - ambiguous or unresolved identity fails closed;
 - fuzzy title comparison happens only after identity and date gates;
 - source rank orders processing but never silently makes a source authoritative;
-- work and output are bounded by policy;
+- work and output are bounded by policy; an additional finding beyond the configured output cap fails closed rather than truncating results;
 - duplicate screening returns candidates and never deletes an event;
 - corrections preserve caller-owned UID values and increment sequence numbers;
 - serialization uses an injected clock and rejects ambiguous timed output.
@@ -149,19 +149,25 @@ tolerance, a 10,000-comparison cap, and subjectless matching disabled.
 Title similarity uses normalized token-set Jaccard similarity. It is evidence
 for a match, not identity proof. A resolver may supply an opaque subject ID, but
 ambiguous or missing resolver results do not fall back to subjectless matching.
+Timed matches require both start and end instants to be within the configured
+time tolerance; all-day matches compare both exclusive date endpoints. Aware
+timestamps are compared as instants in UTC for date compatibility.
 
 ### Reconciliation outcomes
 
 `reconcile` returns immutable `Agreement` and `Conflict` tuples in stable order.
 Conflicts distinguish date, time, and source disagreement. Rank and precedence
 control deterministic traversal only; they never resolve a disagreement by
-themselves.
+themselves. Similar-title evidence on different dates is aggregated into one
+date conflict only when no aligned match exists for that event.
 
 ### Duplicate screening
 
 `screen_duplicates` compares proposed events with existing events and returns
 `DuplicateCandidate` values. Tied candidates are either skipped or reported as
-`AmbiguousDuplicateCandidate`, according to policy. Nothing is mutated or
+`AmbiguousDuplicateCandidate`, according to policy. If another candidate would
+exceed `max_findings`, both reconciliation and duplicate screening raise
+`BoundsError` rather than returning a partial result. Nothing is mutated or
 deleted.
 
 ### Corrections and RFC 5545

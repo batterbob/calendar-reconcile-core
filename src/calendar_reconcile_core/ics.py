@@ -17,7 +17,7 @@ _DISALLOWED_CONTROLS: Final = frozenset(chr(value) for value in range(32)) - {
     "\n",
     "\r",
     "\t",
-}
+} | {"\x7f"}
 
 
 def _safe_text(value: str, field: str) -> str:

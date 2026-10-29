@@ -41,9 +41,20 @@ def _evidence_key(item: EvidenceEvent, policy: ReconcilePolicy) -> tuple[int, in
     return (-precedence, -item.source_rank, -item.confidence, item.source_id, item.evidence_id)
 
 
-def _check_bounds(events: tuple[CalendarEvent, ...], evidence: tuple[EvidenceEvent, ...], policy: ReconcilePolicy) -> None:
+def _check_bounds(events: tuple[CalendarEvent, ...], evidence: tuple[EvidenceEvent, ...],
+                  policy: ReconcilePolicy) -> None:
     if len(events) > policy.max_events or len(evidence) > policy.max_evidence:
         raise BoundsError("input collection exceeds policy limit")
+
+
+def _require_unique_ids(identifiers: tuple[str, ...]) -> None:
+    if len(identifiers) != len(set(identifiers)):
+        raise IdentityError("duplicate opaque identifiers")
+
+
+def _check_finding_capacity(policy: ReconcilePolicy, *, current_count: int) -> None:
+    if current_count >= policy.max_findings:
+        raise BoundsError("finding limit exceeded")
 
 
 def reconcile(events: tuple[CalendarEvent, ...] | list[CalendarEvent],
@@ -58,11 +69,14 @@ def reconcile(events: tuple[CalendarEvent, ...] | list[CalendarEvent],
     """
     event_items, evidence_items = tuple(events), tuple(evidence)
     _check_bounds(event_items, evidence_items, policy)
+    _require_unique_ids(tuple(event.event_id for event in event_items))
+    _require_unique_ids(tuple(item.evidence_id for item in evidence_items))
     comparisons = 0
     agreements: list[Agreement] = []
     conflicts: list[Conflict] = []
     for event in sorted(event_items, key=_event_key):
         matches: list[EvidenceEvent] = []
+        date_mismatches: list[EvidenceEvent] = []
         for item in sorted(evidence_items, key=lambda item: _evidence_key(item, policy)):
             comparisons += 1
             if comparisons > policy.max_candidate_comparisons:
@@ -85,23 +99,29 @@ def reconcile(events: tuple[CalendarEvent, ...] | list[CalendarEvent],
                 )
                 and title_similarity(event, item, policy) >= policy.title_match_threshold
             ):
-                conflicts.append(Conflict(event.event_id, (item.evidence_id,), Reason.DATE_MISMATCH))
-                if len(agreements) + len(conflicts) >= policy.max_findings:
-                    return tuple(agreements), tuple(conflicts)
+                date_mismatches.append(item)
         if not matches:
+            if date_mismatches:
+                _check_finding_capacity(policy, current_count=len(agreements) + len(conflicts))
+                conflicts.append(Conflict(
+                    event.event_id,
+                    tuple(sorted(item.evidence_id for item in date_mismatches)),
+                    Reason.DATE_MISMATCH,
+                ))
             continue
         # A source never becomes authoritative by rank alone. Different dates
         # among matched evidence are an explicit conflict.
         dates = {(item.start, item.end) for item in matches}
         ids = tuple(sorted(item.evidence_id for item in matches))
         if len(dates) > 1:
+            _check_finding_capacity(policy, current_count=len(agreements) + len(conflicts))
             conflicts.append(Conflict(event.event_id, ids, Reason.SOURCE_DISAGREEMENT))
         elif all(times_compatible(event, item, policy) for item in matches):
+            _check_finding_capacity(policy, current_count=len(agreements) + len(conflicts))
             agreements.append(Agreement(event.event_id, ids))
         else:
+            _check_finding_capacity(policy, current_count=len(agreements) + len(conflicts))
             conflicts.append(Conflict(event.event_id, ids, Reason.TIME_MISMATCH))
-        if len(agreements) + len(conflicts) >= policy.max_findings:
-            break
     return tuple(agreements), tuple(conflicts)
 
 
@@ -113,6 +133,8 @@ def screen_duplicates(proposed: tuple[CalendarEvent, ...] | list[CalendarEvent],
     proposed_items, existing_items = tuple(proposed), tuple(existing)
     if len(proposed_items) > policy.max_events or len(existing_items) > policy.max_events:
         raise BoundsError("input collection exceeds policy limit")
+    _require_unique_ids(tuple(event.event_id for event in proposed_items))
+    _require_unique_ids(tuple(event.event_id for event in existing_items))
     comparisons = 0
     found: list[DuplicateCandidate | AmbiguousDuplicateCandidate] = []
     for candidate in sorted(proposed_items, key=_event_key):
@@ -150,6 +172,7 @@ def screen_duplicates(proposed: tuple[CalendarEvent, ...] | list[CalendarEvent],
         if len(tied) > 1 and policy.ambiguity_behavior is AmbiguityBehavior.SKIP:
             continue
         if len(tied) > 1:
+            _check_finding_capacity(policy, current_count=len(found))
             found.append(AmbiguousDuplicateCandidate(
                 candidate.event_id,
                 tuple(current.event_id for _, current in tied),
@@ -157,9 +180,8 @@ def screen_duplicates(proposed: tuple[CalendarEvent, ...] | list[CalendarEvent],
             ))
         else:
             similarity, current = tied[0]
+            _check_finding_capacity(policy, current_count=len(found))
             found.append(DuplicateCandidate(candidate.event_id, current.event_id, similarity))
-        if len(found) >= policy.max_findings:
-            return tuple(found)
     return tuple(found)
 
 

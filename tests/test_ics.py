@@ -65,6 +65,12 @@ def test_text_control_characters_cannot_inject_properties(field: str) -> None:
         serialize_event(event(), uid="a\r\nEVIL:property", now=NOW)
 
 
+@pytest.mark.parametrize("field", ["title", "details", "location"])
+def test_text_del_character_is_rejected(field: str) -> None:
+    with pytest.raises(CalendarReconcileError, match="control"):
+        serialize_event(event(**{field: "safe\x7fvalue"}), uid="a", now=NOW)
+
+
 def test_folding_respects_octets_and_utf8_boundaries() -> None:
     result = serialize_event(event(title="é" * 80), uid="a", now=NOW)
     physical = result.split("\r\n")
